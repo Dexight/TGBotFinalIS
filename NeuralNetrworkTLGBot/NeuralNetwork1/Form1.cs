@@ -60,7 +60,7 @@ namespace NeuralNetwork1
             this.networksFabric = networksFabric;
             netTypeBox.Items.AddRange(this.networksFabric.Keys.Select(s => (object)s).ToArray());
             netTypeBox.SelectedIndex = 0;
-            tlgBot = new TLGBotik(Net, new UpdateTLGMessages(UpdateTLGInfo));
+            tlgBot = new TLGBotik(this, Net, new UpdateTLGMessages(UpdateTLGInfo));
             generator.FigureCount = (int)classCounter.Value;
             button3_Click(this, null);
             //pictureBox1.Image = Properties.Resources.Title;
@@ -98,6 +98,12 @@ namespace NeuralNetwork1
 
             label8.Text = string.Join("\n", figure.Output.Select(d => d.ToString(CultureInfo.InvariantCulture)));
             pictureBox1.Image = generator.GenBitmap();
+            pictureBox1.Invalidate();
+        }
+
+        public void UpdatePicture(Bitmap bm)
+        {
+            pictureBox1.Image = bm;
             pictureBox1.Invalidate();
         }
 

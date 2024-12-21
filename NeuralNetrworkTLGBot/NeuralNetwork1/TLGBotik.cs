@@ -10,7 +10,9 @@ using Telegram.Bot.Exceptions;
 using Telegram.Bot.Extensions.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-
+using System.Windows.Forms;
+using AForge.WindowsForms;
+using System.Reflection.Emit;
 
 namespace NeuralNetwork1
 {
@@ -21,10 +23,15 @@ namespace NeuralNetwork1
         private UpdateTLGMessages formUpdater;
 
         private BaseNetwork perseptron = null;
+        Form1 motherForm;
+
+        AForge.WindowsForms.MagicEye eye = new AForge.WindowsForms.MagicEye();
+
         // CancellationToken - инструмент для отмены задач, запущенных в отдельном потоке
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
-        public TLGBotik(BaseNetwork net,  UpdateTLGMessages updater)
-        { 
+        public TLGBotik(Form1 motherForm, BaseNetwork net,  UpdateTLGMessages updater)
+        {
+            this.motherForm = motherForm;
             var botKey = System.IO.File.ReadAllText("botkey.txt");
             botik = new Telegram.Bot.TelegramBotClient(botKey);
             formUpdater = updater;
@@ -56,20 +63,37 @@ namespace NeuralNetwork1
                 System.Drawing.Bitmap bm = new System.Drawing.Bitmap(img);
 
                 //  Масштабируем aforge
-                AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(200,200);
-                var uProcessed = scaleFilter.Apply(AForge.Imaging.UnmanagedImage.FromManagedImage(bm));
+                //AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(75, 125);
+                //var uProcessed = scaleFilter.Apply(AForge.Imaging.UnmanagedImage.FromManagedImage(bm));
+
+                //AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(75, 125);
+                //bm = scaleFilter.Apply(bm);
+                eye.ProcessImage(bm);
+                bm = eye.processed;
+
+
+                // меняет изображение в форме, но падает для нескольких запросов
+                //motherForm.UpdatePicture(bm);
+
+
 
                 //Sample sample = GenerateImage.GenerateFigure(uProcessed);
+                Sample sample = DatasetManager.CreateOneSample(bm);
+                string res = "";
 
-                //switch(perseptron.Predict(sample))
-                //{
-                //    case FigureType.Rectangle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, это был прямоугольник!");break;
-                //    case FigureType.Circle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, кружочек!"); break;
-                //    case FigureType.Sinusiod: botik.SendTextMessageAsync(message.Chat.Id, "Синусоида!"); break;
-                //    case FigureType.Triangle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, это был треугольник!"); break;
-                //    default: botik.SendTextMessageAsync(message.Chat.Id, "Я такого не знаю!"); break;
-                //}
-
+                switch(perseptron.Predict(sample))
+                {
+                    case FigureType.One: res = "1"; break;
+                    case FigureType.Two: res = "2"; break;
+                    case FigureType.Three: res = "3"; break;
+                    case FigureType.Four: res = "4"; break;
+                    case FigureType.Five: res = "5"; break;
+                    case FigureType.Six: res = "6"; break;
+                    case FigureType.Seven: res = "7"; break;
+                    case FigureType.Eight: res = "8"; break;
+                    case FigureType.Nine: res = "9"; break;
+                }
+                botik.SendTextMessageAsync(message.Chat.Id, "Я думаю это цифра " + res);
                 formUpdater("Picture recognized!");
                 return;
             }
@@ -77,7 +101,7 @@ namespace NeuralNetwork1
             if (message == null || message.Type != MessageType.Text) return;
             if(message.Text == "Authors")
             {
-                string authors = "Гаянэ Аршакян, Луспарон Тызыхян, Дамир Казеев, Роман Хыдыров, Владимир Садовский, Анастасия Аскерова, Константин Бервинов, и Борис Трикоз (но он уже спать ушел) и молчаливый Даниил Ярошенко, а год спустя ещё Иванченко Вячеслав";
+                string authors = "Мовчан Егор, Тупикин Олег, Панихидин Дима";
                 botik.SendTextMessageAsync(message.Chat.Id, "Авторы проекта : " + authors);
             }
             botik.SendTextMessageAsync(message.Chat.Id, "Bot reply : " + message.Text);
@@ -116,6 +140,5 @@ namespace NeuralNetwork1
         {
             cts.Cancel();
         }
-
     }
 }
