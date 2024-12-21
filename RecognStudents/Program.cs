@@ -17,7 +17,6 @@ namespace AForge.WindowsForms
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            DatasetManager.CreateDataset();
             //Application.Run(new MainForm());
             Application.Run(new NeuralNetworksStand(new Dictionary<string, Func<int[], BaseNetwork>>
             {
