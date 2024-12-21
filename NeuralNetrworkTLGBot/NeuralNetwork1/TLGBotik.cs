@@ -14,6 +14,7 @@ using System.Windows.Forms;
 using AForge.WindowsForms;
 using System.Reflection.Emit;
 using System.Reflection;
+using System.Drawing;
 
 namespace NeuralNetwork1
 {
@@ -93,10 +94,11 @@ namespace NeuralNetwork1
 
                 //AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(75, 125);
                 //bm = scaleFilter.Apply(bm);
-                eye.ProcessImage(bm);
-                bm = eye.processed;
+                
+                bm = ProcessImage(bm);
 
                 AddToInputs(bm);
+
                 // меняет изображение в форме, но падает для нескольких запросов
                 //motherForm.UpdatePicture(bm);
 
@@ -164,6 +166,86 @@ namespace NeuralNetwork1
         public void Stop()
         {
             cts.Cancel();
+        }
+
+        public Bitmap ProcessImage(Bitmap original)
+        {
+            // На вход поступает необработанное изображение из ORIGIN
+
+            //  Теперь всю эту муть пилим в обработанное изображение
+            var orig = AForge.Imaging.UnmanagedImage.FromManagedImage(original);
+
+            AForge.Imaging.Filters.Grayscale grayFilter = new AForge.Imaging.Filters.Grayscale(0.2125, 0.7154, 0.0721);
+            var uProcessed = grayFilter.Apply(orig);
+
+            //  Пороговый фильтр
+            AForge.Imaging.Filters.BradleyLocalThresholding threshldFilter = new AForge.Imaging.Filters.BradleyLocalThresholding();
+            threshldFilter.PixelBrightnessDifferenceLimit = 0.15f;
+            threshldFilter.ApplyInPlace(uProcessed);
+
+            return processSample(uProcessed);
+        }
+
+        private Bitmap processSample(AForge.Imaging.UnmanagedImage unmanaged)
+        {
+            ///  Инвертируем изображение
+            AForge.Imaging.Filters.Invert InvertFilter = new AForge.Imaging.Filters.Invert();
+            InvertFilter.ApplyInPlace(unmanaged);
+
+            CutAndScalePicture(ref unmanaged);
+
+            return unmanaged.ToManagedImage();
+        }
+
+        private int _sampleSizeX = 75;
+        private int _sampleSizeY = 150;
+
+        void CutAndScalePicture(ref AForge.Imaging.UnmanagedImage unmanaged)
+        {
+            ///    Создаём BlobCounter, выдёргиваем самый большой кусок, масштабируем, пересечение и сохраняем
+            ///    изображение в эксклюзивном использовании
+            AForge.Imaging.BlobCounterBase bc = new AForge.Imaging.BlobCounter();
+
+            bc.FilterBlobs = true;
+            bc.MinWidth = 3;
+            bc.MinHeight = 3;
+            // Упорядочиваем по размеру
+            bc.ObjectsOrder = AForge.Imaging.ObjectsOrder.Size;
+
+            // Обрабатываем картинку
+            bc.ProcessImage(unmanaged);
+
+            Rectangle[] rects = bc.GetObjectsRectangles();
+
+            // К сожалению, код с использованием подсчёта blob'ов не работает, поэтому просто высчитываем максимальное покрытие
+            // для всех блобов - для нескольких цифр, к примеру, 16, можем получить две области - отдельно для 1, и отдельно для 6.
+            // Строим оболочку, включающую все блоки. Решение плохое, требуется доработка
+            int lx = unmanaged.Width;
+            int ly = unmanaged.Height;
+            int rx = 0;
+            int ry = 0;
+            for (int i = 0; i < rects.Length; ++i)
+            {
+                if (lx > rects[i].X) lx = rects[i].X;
+                if (ly > rects[i].Y) ly = rects[i].Y;
+                if (rx < rects[i].X + rects[i].Width) rx = rects[i].X + rects[i].Width;
+                if (ry < rects[i].Y + rects[i].Height) ry = rects[i].Y + rects[i].Height;
+            }
+
+            // Обрезаем края, оставляя только центральные блобчики
+            AForge.Imaging.Filters.Crop cropFilter = new AForge.Imaging.Filters.Crop(new Rectangle(lx, ly, rx - lx, ry - ly));
+            try
+            {
+                unmanaged = cropFilter.Apply(unmanaged);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("Ошибка чтения символа с картинки");
+            }
+
+            //  Масштабируем до нужного размера
+            AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(_sampleSizeX, _sampleSizeY);
+            unmanaged = scaleFilter.Apply(unmanaged);
         }
     }
 }
