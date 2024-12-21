@@ -11,6 +11,7 @@ using System.Linq;
 using System.Runtime;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Xml.Linq;
 
 namespace NeuralNetwork1
 {
@@ -165,7 +166,7 @@ namespace NeuralNetwork1
         }
 
         string pathOrigin = Directory.GetParent(Directory.GetCurrentDirectory()).Parent.FullName + "\\ORIGIN";
-        string path = Directory.GetParent(Directory.GetCurrentDirectory()).Parent.FullName + "\\DATASET";
+        string pathDataset = Directory.GetParent(Directory.GetCurrentDirectory()).Parent.FullName + "\\DATASET";
 
         private void button3_Click(object sender, EventArgs e)
         {
@@ -173,20 +174,46 @@ namespace NeuralNetwork1
             int[] structure = CurrentNetworkStructure();
 
             // Пересоздаём датасет
-            var dirsOrigin = Directory.GetDirectories(pathOrigin); // получаем пути к папкам датасета
 
-            // Очищаем все папки
-            //TODO
+            oldDatasetClear();
 
+            createNewDataset();
+
+            DatasetManager.CreateDataset();
+
+            // Чистим старые подписки сетей
+            foreach (var network in networksCache.Values)
+                network.TrainProgress -= UpdateLearningInfo;
+            // Пересоздаём все сети с новой структурой
+            networksCache = networksCache.ToDictionary(oldNet => oldNet.Key, oldNet => CreateNetwork(oldNet.Key));
+        }
+
+        private void oldDatasetClear()
+        {
+            Console.WriteLine("Очистка старого датасета");
+            // Очищаем все папки в DATASET
+            var dirsDataset = Directory.GetDirectories(pathDataset); // получаем пути к папкам датасета
+            foreach (string dir in dirsDataset)
+            {
+                string[] files = Directory.GetFiles(dir);
+                foreach (var file in files)
+                    File.Delete(file);
+            }
+        }
+
+        private void createNewDataset()
+        {
+            Console.WriteLine("Формирование нового датасета");
             //Создаём новые образцы
+            var dirsOrigin = Directory.GetDirectories(pathOrigin); // получаем пути к папкам датасета
             foreach (var dir in dirsOrigin)
             {
                 var key = dir.Substring(dir.Length - 1);
                 string[] fnames = Directory.GetFiles(dir);
 
                 // папка датасета (куда сохраняем)
-                string targetPath = Path.Combine(path, key);
-        
+                string targetPath = Path.Combine(pathDataset, key);
+
                 if (!Directory.Exists(targetPath))
                 {
                     Console.WriteLine($"Папка {targetPath} не существует.");
@@ -197,14 +224,16 @@ namespace NeuralNetwork1
                 //для каждого оригинала
                 foreach (string fname in fnames)
                 {
-                    Console.WriteLine(fname);
                     // добавить в датасет
                     try
                     {
                         using (Bitmap bmp = new Bitmap(fname))
                         {
-                            Bitmap processedImage = ProcessImage(bmp);
-                            processedImage.Save(Path.Combine(targetPath, index++ + ".bmp"), System.Drawing.Imaging.ImageFormat.Bmp);
+                            List<Bitmap> processedImages = ProcessImage(bmp);
+                            foreach(Bitmap img in processedImages)
+                            {
+                                img.Save(Path.Combine(targetPath, key + "_" + index++ + ".bmp"), System.Drawing.Imaging.ImageFormat.Bmp);
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -213,12 +242,7 @@ namespace NeuralNetwork1
                     }
                 }
             }
-
-            // Чистим старые подписки сетей
-            foreach (var network in networksCache.Values)
-                network.TrainProgress -= UpdateLearningInfo;
-            // Пересоздаём все сети с новой структурой
-            networksCache = networksCache.ToDictionary(oldNet => oldNet.Key, oldNet => CreateNetwork(oldNet.Key));
+            Console.WriteLine("Датасет успешно сформирован");
         }
 
         private int[] CurrentNetworkStructure()
@@ -269,7 +293,7 @@ namespace NeuralNetwork1
             infoStatusLabel.Text = "Тестировать нейросеть на тестовой выборке такого же размера";
         }
 
-        public Bitmap ProcessImage(Bitmap original)
+        public List<Bitmap> ProcessImage(Bitmap original)
         {
             // На вход поступает необработанное изображение из ORIGIN
 
@@ -284,21 +308,42 @@ namespace NeuralNetwork1
             threshldFilter.PixelBrightnessDifferenceLimit = 0.15f;
             threshldFilter.ApplyInPlace(uProcessed);
 
-            string info = processSample(ref uProcessed);
-            return uProcessed.ToManagedImage();
+            return processSample(uProcessed);
+        }
+
+        private List<Bitmap> processSample(AForge.Imaging.UnmanagedImage orig_unmanaged)
+        {
+            List<Bitmap> samples = new List<Bitmap>();
+            // Добавляем аугментацию — повороты
+            float[] angles = { -15f, 10f, -5f, 0f, 5f, 10f, 15f }; // Углы поворота
+            foreach (float angle in angles)
+            {
+                var unmanaged = orig_unmanaged.Clone();
+
+                ///  Инвертируем изображение
+                AForge.Imaging.Filters.Invert InvertFilter = new AForge.Imaging.Filters.Invert();
+                InvertFilter.ApplyInPlace(unmanaged);
+
+                CutAndScalePicture(ref unmanaged);
+
+                //поворот
+                AForge.Imaging.Filters.RotateBilinear rotateFilter = new AForge.Imaging.Filters.RotateBilinear(angle);
+                rotateFilter.FillColor = Color.Black; // Задаем цвет фона для пустых областей
+                unmanaged = rotateFilter.Apply(unmanaged);
+
+                CutAndScalePicture(ref unmanaged);
+
+                samples.Add(unmanaged.ToManagedImage());
+            }
+
+            return samples;
         }
 
         private int _sampleSizeX = 75;
         private int _sampleSizeY = 150;
 
-        private string processSample(ref AForge.Imaging.UnmanagedImage unmanaged)
+        void CutAndScalePicture(ref AForge.Imaging.UnmanagedImage unmanaged)
         {
-            string rez = "Обработка";
-
-            ///  Инвертируем изображение
-            //AForge.Imaging.Filters.Invert InvertFilter = new AForge.Imaging.Filters.Invert();
-            //InvertFilter.ApplyInPlace(unmanaged);
-
             ///    Создаём BlobCounter, выдёргиваем самый большой кусок, масштабируем, пересечение и сохраняем
             ///    изображение в эксклюзивном использовании
             AForge.Imaging.BlobCounterBase bc = new AForge.Imaging.BlobCounter();
@@ -308,17 +353,11 @@ namespace NeuralNetwork1
             bc.MinHeight = 3;
             // Упорядочиваем по размеру
             bc.ObjectsOrder = AForge.Imaging.ObjectsOrder.Size;
-            // Обрабатываем картинку
 
+            // Обрабатываем картинку
             bc.ProcessImage(unmanaged);
 
             Rectangle[] rects = bc.GetObjectsRectangles();
-            rez = "Насчитали " + rects.Length.ToString() + " прямоугольников!";
-            //if (rects.Length == 0)
-            //{
-            //    finalPics[r, c] = AForge.Imaging.UnmanagedImage.FromManagedImage(new Bitmap(100, 100));
-            //    return 0;
-            //}
 
             // К сожалению, код с использованием подсчёта blob'ов не работает, поэтому просто высчитываем максимальное покрытие
             // для всех блобов - для нескольких цифр, к примеру, 16, можем получить две области - отдельно для 1, и отдельно для 6.
@@ -349,8 +388,6 @@ namespace NeuralNetwork1
             //  Масштабируем до нужного размера
             AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(_sampleSizeX, _sampleSizeY);
             unmanaged = scaleFilter.Apply(unmanaged);
-
-            return rez;
         }
     }
 }
