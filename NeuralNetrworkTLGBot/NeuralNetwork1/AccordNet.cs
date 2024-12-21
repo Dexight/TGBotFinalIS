@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Accord.Neuro;
 using Accord.Neuro.Learning;
-using System.IO;
 
 namespace NeuralNetwork1
 {
@@ -14,134 +11,103 @@ namespace NeuralNetwork1
         /// <summary>
         /// Реализация нейронной сети из Accord.NET
         /// </summary>
-        private ActivationNetwork network = null;
-        
-        /// <summary>
-        /// Значение ошибки при обучении единичному образцу. При обучении на наборе образов не используется
-        /// </summary>
-        public double desiredErrorValue = 0.0005;
+        private ActivationNetwork network;
 
         //  Секундомер спортивный, завода «Агат», измеряет время пробегания стометровки, ну и время затраченное на обучение тоже умеет
-        public System.Diagnostics.Stopwatch stopWatch = new System.Diagnostics.Stopwatch();
+        public Stopwatch stopWatch = new Stopwatch();
 
         /// <summary>
         /// Конструктор сети с указанием структуры (количество слоёв и нейронов в них)
         /// </summary>
-        /// <param name="structure"></param>
+        /// <param name="structure">Массив с указанием нейронов на каждом слое (включая сенсорный)</param>
         public AccordNet(int[] structure)
         {
-            ReInit(structure);
-        }
-        
-        /// <summary>
-        /// Реиницализация сети - создаём заново сеть с указанной структурой
-        /// </summary>
-        /// <param name="structure">Массив с указанием нейронов на каждом слое (включая сенсорный)</param>
-        /// <param name="initialLearningRate">Начальная скорость обучения</param>
-        public override void ReInit(int[] structure, double initialLearningRate = 0.25)
-        {
             // Создаём сеть - вроде того
-            network = new ActivationNetwork((IActivationFunction)new SigmoidFunction(2.0), structure[0],
-                structure.Skip(1).ToArray<int>());
+            network = new ActivationNetwork(new SigmoidFunction(2.0), structure[0], structure.Skip(1).ToArray());
 
             //  Встряска "мозгов" сети - рандомизируем веса связей
             new NguyenWidrow(network).Randomize();
         }
-        
+
+
         /// <summary>
         /// Обучение сети одному образу
         /// </summary>
         /// <param name="sample"></param>
         /// <returns>Количество итераций для достижения заданного уровня ошибки</returns>
-        public override int Train(Sample sample, bool parallel = true)
+        public override int Train(Sample sample, double acceptableError, bool parallel)
         {
-            //  Создаём "обучателя" - либо параллельного, либо последовательного  
-            ISupervisedLearning teacher;
-            if (parallel)
-                teacher = new ParallelResilientBackpropagationLearning(network);
-            else
-                teacher = new ResilientBackpropagationLearning(network);
+            var teacher = MakeTeacher(parallel);
 
             int iters = 1;
-            while (teacher.Run(sample.input, sample.output) > desiredErrorValue) { ++iters; }
+            while (teacher.Run(sample.input, sample.Output) > acceptableError)
+            {
+                ++iters;
+            }
+
             return iters;
         }
 
-        public override double TrainOnDataSet(SamplesSet samplesSet, int epochs_count, double acceptable_erorr, bool parallel = true)
+        //  Создаём "обучателя" - либо параллельного, либо последовательного  
+        private ISupervisedLearning MakeTeacher(bool parallel)
+        {
+            if (parallel)
+                return new ParallelResilientBackpropagationLearning(network);
+            return new ResilientBackpropagationLearning(network);
+        }
+
+        public override double TrainOnDataSet(SamplesSet samplesSet, int epochsCount, double acceptableError,
+            bool parallel)
         {
             //  Сначала надо сконструировать массивы входов и выходов
             double[][] inputs = new double[samplesSet.Count][];
             double[][] outputs = new double[samplesSet.Count][];
-            
+
             //  Теперь массивы из samplesSet группируем в inputs и outputs
-            for(int i = 0; i < samplesSet.Count; ++i)
+            for (int i = 0; i < samplesSet.Count; ++i)
             {
                 inputs[i] = samplesSet[i].input;
-                outputs[i] = samplesSet[i].output;
+                outputs[i] = samplesSet[i].Output;
             }
 
             //  Текущий счётчик эпох
             int epoch_to_run = 0;
 
             //  Создаём "обучателя" - либо параллельного, либо последовательного  
-            ISupervisedLearning teacher;
-            if (parallel)
-                teacher = new ParallelResilientBackpropagationLearning(network);
-            else
-                teacher = new ResilientBackpropagationLearning(network);
+            var teacher = MakeTeacher(parallel);
 
             double error = double.PositiveInfinity;
-            
-            #if DEBUG
+
+#if DEBUG
             StreamWriter errorsFile = File.CreateText("errors.csv");
-            #endif
+#endif
 
             stopWatch.Restart();
 
-            while (epoch_to_run < epochs_count && error > acceptable_erorr)
+            while (epoch_to_run < epochsCount && error > acceptableError)
             {
                 epoch_to_run++;
                 error = teacher.RunEpoch(inputs, outputs);
-                #if DEBUG
+#if DEBUG
                 errorsFile.WriteLine(error);
-                #endif
-                updateDelegate((epoch_to_run * 1.0) / epochs_count, error, stopWatch.Elapsed);
+#endif
+                OnTrainProgress((epoch_to_run * 1.0) / epochsCount, error, stopWatch.Elapsed);
             }
 
-            #if DEBUG
+#if DEBUG
             errorsFile.Close();
-            #endif
+#endif
 
-            updateDelegate(1.0, error, stopWatch.Elapsed);
+            OnTrainProgress(1.0, error, stopWatch.Elapsed);
 
             stopWatch.Stop();
 
             return error;
         }
 
-        public override FigureType Predict(Sample sample)
+        protected override double[] Compute(double[] input)
         {
-            sample.output = network.Compute(sample.input);
-            sample.processOutput();
-            return sample.recognizedClass;
-        }
-
-        public override double TestOnDataSet(SamplesSet testSet)
-        {
-            double correct = 0.0;
-            for (int i = 0; i < testSet.Count; ++i)
-            {
-                testSet[i].output = network.Compute(testSet[i].input);
-                testSet[i].processOutput();
-                if (testSet[i].actualClass == testSet[i].recognizedClass) correct += 1;
-            }
-            return correct/testSet.Count;
-        }
-
-        public override double[] getOutput()
-        {
-            return network.Output;
+            return network.Compute(input);
         }
     }
-
 }

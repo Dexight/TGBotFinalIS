@@ -10,7 +10,7 @@ namespace NeuralNetwork1
     /// <summary>
     /// Тип фигуры
     /// </summary>
-    public enum FigureType : byte { Triangle = 0, Rectangle, Circle, Sinusiod, Undef };
+    public enum FigureType : byte { Zero = 0, One, Two, Three, Four, Five, Six, Seven, Eight, Nine, Undef};
     
     public class GenerateImage
     {
@@ -25,27 +25,27 @@ namespace NeuralNetwork1
         /// <summary>
         /// Текущая сгенерированная фигура
         /// </summary>
-        public FigureType current_figure = FigureType.Undef;
+        public FigureType currentFigure = FigureType.Undef;
 
         /// <summary>
         /// Количество классов генерируемых фигур (4 - максимум)
         /// </summary>
-        public int figure_count { get; set; } = 4;
+        public int FigureCount { get; set; } = 4;
 
         /// <summary>
         /// Диапазон смещения центра фигуры (по умолчанию +/- 20 пикселов от центра)
         /// </summary>
-        public int figureCenterGitter { get; set; } = 50;
+        public int FigureCenterGitter { get; set; } = 50;
 
         /// <summary>
         /// Диапазон разброса размера фигур
         /// </summary>
-        public int figureSizeGitter { get; set; } = 50;
+        public int FigureSizeGitter { get; set; } = 50;
 
         /// <summary>
         /// Диапазон разброса размера фигур
         /// </summary>
-        public int figureSize { get; set; } = 100;
+        public int FigureSize { get; set; } = 100;
         
         /// <summary>
         /// Очистка образа
@@ -59,12 +59,12 @@ namespace NeuralNetwork1
 
         public Sample GenerateFigure()
         {
-            generate_figure();
+            //generate_figure();
             double[] input = new double[400];
             for (int i = 0; i < 400; i++)
                 input[i] = 0;
 
-            FigureType type = current_figure;
+            FigureType type = currentFigure;
 
             for (int i = 0; i < 200; i++)
                 for (int j = 0; j < 200; j++)
@@ -73,71 +73,53 @@ namespace NeuralNetwork1
                         input[i] += 1;
                         input[200 + j] += 1;
                     }
-            return new Sample(input, figure_count, type);
-        }
-
-        public static Sample GenerateFigure(AForge.Imaging.UnmanagedImage img)
-        {
-            double[] input = new double[400];
-            for (int i = 0; i < 400; i++)
-                input[i] = 0;
-
-            FigureType type = FigureType.Undef;
-
-            for (int i = 0; i < 200; i++)
-                for (int j = 0; j < 200; j++)
-                    if (img.GetPixel(i, j).GetBrightness() < 0.5)
-                    {
-                        input[i] += 1;
-                        input[200 + j] += 1;
-                    }
-            return new Sample(input, 4, type);
+            return new Sample(input, FigureCount, type);
         }
 
         private Point GetLeftUpperPoint()
         {
-            int X = 100 - figureSize / 2 + rand.Next(-figureSizeGitter / 2, figureSizeGitter / 2);
-            int Y = 100 - figureSize / 2 + rand.Next(-figureSizeGitter / 2, figureSizeGitter / 2);
-            return new Point(X,Y);
+            int x = 100 - FigureSize / 2 + rand.Next(-FigureSizeGitter / 2, FigureSizeGitter / 2);
+            int y = 100 - FigureSize / 2 + rand.Next(-FigureSizeGitter / 2, FigureSizeGitter / 2);
+            return new Point(x,y);
         }
 
         private Point GetRightDownPoint()
         {
-            int X = 100 + figureSize / 2 + rand.Next(-figureSizeGitter / 2, figureSizeGitter / 2);
-            int Y = 100 + figureSize / 2 + rand.Next(-figureSizeGitter / 2, figureSizeGitter / 2);
-            return new Point(X, Y);
+            int x = 100 + FigureSize / 2 + rand.Next(-FigureSizeGitter / 2, FigureSizeGitter / 2);
+            int y = 100 + FigureSize / 2 + rand.Next(-FigureSizeGitter / 2, FigureSizeGitter / 2);
+            return new Point(x, y);
         }
 
         private Point GetCenterPoint()
         {
-            int X = 100 + rand.Next(-figureSizeGitter / 2, figureSizeGitter / 2);
-            int Y = 100 + rand.Next(-figureSizeGitter / 2, figureSizeGitter / 2);
-            return new Point(X, Y);
+            int x = 100 + rand.Next(-FigureSizeGitter / 2, FigureSizeGitter / 2);
+            int y = 100 + rand.Next(-FigureSizeGitter / 2, FigureSizeGitter / 2);
+            return new Point(x, y);
         }
        
-        public void get_random_figure()
-        {
-            ClearImage();
-            int type = rand.Next(0, 4);
-            switch (type)
-            {
-                case 0:
-                    create_sin();
-                    break;
-                case 1:
-                    create_rectangle();
-                    break;
-                case 2:
-                    create_triangle();
-                    break;
-                default:
-                case 3:
-                    create_circle();
-                    break;
-            }
-        }
+        //public void get_random_figure()
+        //{
+        //    ClearImage();
+        //    int type = rand.Next(0, 4);
+        //    switch (type)
+        //    {
+        //        case 0:
+        //            create_sin();
+        //            break;
+        //        case 1:
+        //            create_rectangle();
+        //            break;
+        //        case 2:
+        //            create_triangle();
+        //            break;
+        //        default:
+        //        case 3:
+        //            create_circle();
+        //            break;
+        //    }
+        //}
 
-        private void bresenham(int x, int y, int x2, int y2)
+        private void Bresenham(int x, int y, int x2, int y2)
         {
             int w = x2 - x;
             int h = y2 - y;
@@ -175,104 +157,104 @@ namespace NeuralNetwork1
             }
         }
 
-        public bool create_triangle()
-        {
-            current_figure = FigureType.Triangle;
-            Point leftUpper = GetLeftUpperPoint();
-            Point downLeft = GetRightDownPoint();
-            int centerX = 100 + figureCenterGitter;
+        //public bool create_triangle()
+        //{
+        //    currentFigure = FigureType.Triangle;
+        //    Point leftUpper = GetLeftUpperPoint();
+        //    Point downLeft = GetRightDownPoint();
+        //    int centerX = 100 + FigureCenterGitter;
 
 
-            bresenham(leftUpper.X, downLeft.Y, centerX, leftUpper.Y);
-            bresenham(centerX, leftUpper.Y, downLeft.X, downLeft.Y);
-            bresenham(downLeft.X, downLeft.Y, leftUpper.X, downLeft.Y);
+        //    Bresenham(leftUpper.X, downLeft.Y, centerX, leftUpper.Y);
+        //    Bresenham(centerX, leftUpper.Y, downLeft.X, downLeft.Y);
+        //    Bresenham(downLeft.X, downLeft.Y, leftUpper.X, downLeft.Y);
 
-            return true;
-        }
+        //    return true;
+        //}
 
-        public bool create_rectangle()
-        {
-            current_figure = FigureType.Rectangle;
+        //public bool create_rectangle()
+        //{
+        //    currentFigure = FigureType.Rectangle;
 
-            Point leftUpper = GetLeftUpperPoint();
-            Point downLeft = GetRightDownPoint();
+        //    Point leftUpper = GetLeftUpperPoint();
+        //    Point downLeft = GetRightDownPoint();
 
-            bresenham(leftUpper.X, leftUpper.Y, downLeft.X, leftUpper.Y);
-            bresenham(downLeft.X, leftUpper.Y, downLeft.X, downLeft.Y);
-            bresenham(downLeft.X, downLeft.Y, leftUpper.X, downLeft.Y);
-            bresenham(leftUpper.X, downLeft.Y, leftUpper.X, leftUpper.Y);
-            return true;
-        }
+        //    Bresenham(leftUpper.X, leftUpper.Y, downLeft.X, leftUpper.Y);
+        //    Bresenham(downLeft.X, leftUpper.Y, downLeft.X, downLeft.Y);
+        //    Bresenham(downLeft.X, downLeft.Y, leftUpper.X, downLeft.Y);
+        //    Bresenham(leftUpper.X, downLeft.Y, leftUpper.X, leftUpper.Y);
+        //    return true;
+        //}
 
-        public bool create_circle()
-        {
-            current_figure = FigureType.Circle;
+        //public bool create_circle()
+        //{
+        //    currentFigure = FigureType.Circle;
 
-            Point center = GetCenterPoint();
+        //    Point center = GetCenterPoint();
 
-            int radius = rand.Next(50, 65);
+        //    int radius = rand.Next(50, 65);
 
-            for (double t = 0; t < 2 * Math.PI; t += 0.01)
-            {
-                double x = center.X + radius * Math.Cos(t);
-                double y = center.Y + radius * Math.Sin(t);
-                img[(int)x, (int)y] = true;
-            }
-            return true;
-        }
+        //    for (double t = 0; t < 2 * Math.PI; t += 0.01)
+        //    {
+        //        double x = center.X + radius * Math.Cos(t);
+        //        double y = center.Y + radius * Math.Sin(t);
+        //        img[(int)x, (int)y] = true;
+        //    }
+        //    return true;
+        //}
 
-        public bool create_sin()
-        {
-            current_figure = FigureType.Sinusiod;
+        //public bool create_sin()
+        //{
+        //    currentFigure = FigureType.Sinusiod;
 
-            Point leftUpper = GetLeftUpperPoint();
-            Point downLeft = GetRightDownPoint();
+        //    Point leftUpper = GetLeftUpperPoint();
+        //    Point downLeft = GetRightDownPoint();
 
-            int amp = (downLeft.Y - leftUpper.Y) / 2;
-            int centerY = leftUpper.Y + amp;
+        //    int amp = (downLeft.Y - leftUpper.Y) / 2;
+        //    int centerY = leftUpper.Y + amp;
 
-            double sx = 0.25;
-            for (double x = leftUpper.X; x <= downLeft.X; x += 0.05)
-            {
-                double y = Math.Round(centerY + amp * Math.Sin(sx * x));
-                img[(int)x, (int)y] = true;
-            }
+        //    double sx = 0.25;
+        //    for (double x = leftUpper.X; x <= downLeft.X; x += 0.05)
+        //    {
+        //        double y = Math.Round(centerY + amp * Math.Sin(sx * x));
+        //        img[(int)x, (int)y] = true;
+        //    }
 
-            return true;
-        }
+        //    return true;
+        //}
 
 
-        public void generate_figure(FigureType type = FigureType.Undef)
-        {
+        //public void generate_figure(FigureType type = FigureType.Undef)
+        //{
 
-            if (type == FigureType.Undef || (int)type >= figure_count)
-                type = (FigureType)rand.Next(figure_count);
-            ClearImage();
-            switch (type)
-            {
-                case FigureType.Rectangle : create_rectangle(); break;
-                case FigureType.Triangle  : create_triangle(); break;
-                case FigureType.Circle    : create_circle(); break;
-                case FigureType.Sinusiod  : create_sin(); break;
+        //    if (type == FigureType.Undef || (int)type >= FigureCount)
+        //        type = (FigureType)rand.Next(FigureCount);
+        //    ClearImage();
+        //    switch (type)
+        //    {
+        //        case FigureType.Rectangle : create_rectangle(); break;
+        //        case FigureType.Triangle  : create_triangle(); break;
+        //        case FigureType.Circle    : create_circle(); break;
+        //        case FigureType.Sinusiod  : create_sin(); break;
 
-                default:
-                    type = FigureType.Undef;
-                    throw new Exception("WTF?!!! Не могу я создать такую фигуру!");
-            }
-        }
+        //        default:
+        //            type = FigureType.Undef;
+        //            throw new Exception("WTF?!!! Не могу я создать такую фигуру!");
+        //    }
+        //}
 
         /// <summary>
         /// Возвращает битовое изображение для вывода образа
         /// </summary>
         /// <returns></returns>
-        public Bitmap genBitmap()
+        public Bitmap GenBitmap()
         {
-            Bitmap DrawArea = new Bitmap(200, 200);
+            Bitmap drawArea = new Bitmap(200, 200);
             for (int i = 0; i < 200; ++i)
                 for (int j = 0; j < 200; ++j)
                     if (img[i, j])
-                        DrawArea.SetPixel(i, j, Color.Black);
-            return DrawArea;
+                        drawArea.SetPixel(i, j, Color.Black);
+            return drawArea;
         }
     }
 

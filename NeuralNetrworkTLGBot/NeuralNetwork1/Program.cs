@@ -16,7 +16,12 @@ namespace NeuralNetwork1
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            Application.Run(new Form1(new Dictionary<string, Func<int[], BaseNetwork>>
+            {
+                // Тут можно добавить свои нейросети
+                {"Accord.Net Perseptron", structure => new AccordNet(structure)},
+                {"Студентческий персептрон", structure => new StudentNetwork(structure)},
+            }));
         }
     }
 }

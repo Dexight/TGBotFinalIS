@@ -1,11 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Diagnostics;
-using System.Text;
-using System.Threading.Tasks;
-using System.Drawing;
-using System.Windows.Forms;
 using System.Collections;
 
 namespace NeuralNetwork1
@@ -19,11 +13,6 @@ namespace NeuralNetwork1
         /// Входной вектор
         /// </summary>
         public double[] input = null;
-
-        /// <summary>
-        /// Выходной вектор, задаётся извне как результат распознавания
-        /// </summary>
-        public double[] output = null;
 
         /// <summary>
         /// Вектор ошибки, вычисляется по какой-нибудь хитрой формуле
@@ -49,8 +38,8 @@ namespace NeuralNetwork1
         {
             //  Клонируем массивчик
             input = (double[]) inputValues.Clone();
-            output = new double[classesCount];
-            if (sampleClass != FigureType.Undef) output[(int)sampleClass] = 1;
+            Output = new double[classesCount];
+            if (sampleClass != FigureType.Undef) Output[(int) sampleClass] = 1;
 
 
             recognizedClass = FigureType.Undef;
@@ -58,20 +47,28 @@ namespace NeuralNetwork1
         }
 
         /// <summary>
+        /// Выходной вектор, задаётся извне как результат распознавания
+        /// </summary>
+        public double[] Output { get; private set; }
+
+        /// <summary>
         /// Обработка реакции сети на данный образ на основе вектора выходов сети
         /// </summary>
-        public void processOutput()
+        public FigureType ProcessPrediction(double[] neuralOutput)
         {
+            Output = neuralOutput;
             if (error == null)
-                error = new double[output.Length];
-            
+                error = new double[Output.Length];
+
             //  Нам так-то выход не нужен, нужна ошибка и определённый класс
             recognizedClass = 0;
-            for(int i = 0; i < output.Length; ++i)
+            for (int i = 0; i < Output.Length; ++i)
             {
-                error[i] = ((i == (int) actualClass ? 1 : 0) - output[i]);
-                if (output[i] > output[(int)recognizedClass]) recognizedClass = (FigureType)i;
+                error[i] = (Output[i] - (i == (int) actualClass ? 1 : 0));
+                if (Output[i] > Output[(int) recognizedClass]) recognizedClass = (FigureType) i;
             }
+
+            return recognizedClass;
         }
 
         /// <summary>
@@ -81,7 +78,7 @@ namespace NeuralNetwork1
         public double EstimatedError()
         {
             double Result = 0;
-            for (int i = 0; i < output.Length; ++i)
+            for (int i = 0; i < Output.Length; ++i)
                 Result += Math.Pow(error[i], 2);
             return Result;
         }
@@ -103,30 +100,37 @@ namespace NeuralNetwork1
         /// <returns></returns>
         public override string ToString()
         {
-            string result = "Sample decoding : " + actualClass.ToString() + "(" + ((int)actualClass).ToString() + "); " + Environment.NewLine + "Input : ";
+            string result = "Sample decoding : " + actualClass.ToString() + "(" + ((int) actualClass).ToString() +
+                            "); " + Environment.NewLine + "Input : ";
             for (int i = 0; i < input.Length; ++i) result += input[i].ToString() + "; ";
             result += Environment.NewLine + "Output : ";
-            if (output == null) result += "null;";
+            if (Output == null) result += "null;";
             else
-                for (int i = 0; i < output.Length; ++i) result += output[i].ToString() + "; ";
+                for (int i = 0; i < Output.Length; ++i)
+                    result += Output[i].ToString() + "; ";
             result += Environment.NewLine + "Error : ";
 
             if (error == null) result += "null;";
             else
-                for (int i = 0; i < error.Length; ++i) result += error[i].ToString() + "; ";
-            result += Environment.NewLine + "Recognized : " + recognizedClass.ToString() + "(" + ((int)recognizedClass).ToString() + "); " + Environment.NewLine;
+                for (int i = 0; i < error.Length; ++i)
+                    result += error[i].ToString() + "; ";
+            result += Environment.NewLine + "Recognized : " + recognizedClass.ToString() + "(" +
+                      ((int) recognizedClass).ToString() + "); " + Environment.NewLine;
 
 
             return result;
         }
-        
+
         /// <summary>
         /// Правильно ли распознан образ
         /// </summary>
         /// <returns></returns>
-        public bool Correct() { return actualClass == recognizedClass; }
+        public bool Correct()
+        {
+            return actualClass == recognizedClass;
+        }
     }
-    
+
     /// <summary>
     /// Выборка образов. Могут быть как классифицированные (обучающая, тестовая выборки), так и не классифицированные (обработка)
     /// </summary>
@@ -136,7 +140,7 @@ namespace NeuralNetwork1
         /// Накопленные обучающие образы
         /// </summary>
         public List<Sample> samples = new List<Sample>();
-        
+
         /// <summary>
         /// Добавление образа к коллекции
         /// </summary>
@@ -145,7 +149,20 @@ namespace NeuralNetwork1
         {
             samples.Add(image);
         }
-        public int Count { get { return samples.Count; } }
+
+        public void Shuffle()
+        {
+            Random random = new Random(); 
+            int n = samples.Count;
+            // Алгоритм Фишера-Йетса
+            for (int i = n - 1; i > 0; i--)
+            {
+                int j = random.Next(i + 1); // Случайный индекс в диапазоне [0, i]
+                (samples[i], samples[j]) = (samples[j], samples[i]); // Обмен элементов
+            }
+        }
+
+        public int Count => samples.Count;
 
         public IEnumerator GetEnumerator()
         {
@@ -159,18 +176,22 @@ namespace NeuralNetwork1
         /// <returns></returns>
         public Sample this[int i]
         {
-            get { return samples[i]; }
-            set { samples[i] = value; }
+            get => samples[i];
+            set => samples[i] = value;
         }
 
-        public double ErrorsCount()
+        public double TestNeuralNetwork(BaseNetwork network)
         {
             double correct = 0;
             double wrong = 0;
             foreach (var sample in samples)
-                if (sample.Correct()) ++correct; else ++wrong;
+            {
+                if (sample.actualClass == network.Predict(sample)) ++correct;
+                else ++wrong;
+            }
             return correct / (correct + wrong);
         }
+
         // Тут бы ещё сохранение в файл и чтение сделать, вообще классно было бы
     }
 }

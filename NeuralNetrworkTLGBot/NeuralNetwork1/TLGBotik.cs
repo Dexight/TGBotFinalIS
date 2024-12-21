@@ -59,16 +59,16 @@ namespace NeuralNetwork1
                 AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(200,200);
                 var uProcessed = scaleFilter.Apply(AForge.Imaging.UnmanagedImage.FromManagedImage(bm));
 
-                Sample sample = GenerateImage.GenerateFigure(uProcessed);
+                //Sample sample = GenerateImage.GenerateFigure(uProcessed);
 
-                switch(perseptron.Predict(sample))
-                {
-                    case FigureType.Rectangle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, это был прямоугольник!");break;
-                    case FigureType.Circle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, кружочек!"); break;
-                    case FigureType.Sinusiod: botik.SendTextMessageAsync(message.Chat.Id, "Синусоида!"); break;
-                    case FigureType.Triangle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, это был треугольник!"); break;
-                    default: botik.SendTextMessageAsync(message.Chat.Id, "Я такого не знаю!"); break;
-                }
+                //switch(perseptron.Predict(sample))
+                //{
+                //    case FigureType.Rectangle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, это был прямоугольник!");break;
+                //    case FigureType.Circle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, кружочек!"); break;
+                //    case FigureType.Sinusiod: botik.SendTextMessageAsync(message.Chat.Id, "Синусоида!"); break;
+                //    case FigureType.Triangle: botik.SendTextMessageAsync(message.Chat.Id, "Это легко, это был треугольник!"); break;
+                //    default: botik.SendTextMessageAsync(message.Chat.Id, "Я такого не знаю!"); break;
+                //}
 
                 formUpdater("Picture recognized!");
                 return;
