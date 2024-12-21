@@ -208,7 +208,7 @@ namespace NeuralNetwork1
             // Пересоздаём все сети с новой структурой
             networksCache = networksCache.ToDictionary(oldNet => oldNet.Key, oldNet => CreateNetwork(oldNet.Key));
 
-            //tlgBot.SetNet(Net);
+            tlgBot.SetNet(Net);
         }
 
         private int[] CurrentNetworkStructure()

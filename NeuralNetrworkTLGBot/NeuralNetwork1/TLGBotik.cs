@@ -110,6 +110,7 @@ namespace NeuralNetwork1
 
                 switch(perseptron.Predict(sample))
                 {
+                    case FigureType.Zero: res = "0"; break;
                     case FigureType.One: res = "1"; break;
                     case FigureType.Two: res = "2"; break;
                     case FigureType.Three: res = "3"; break;
