@@ -178,8 +178,8 @@ namespace NeuralNetwork1
             //SamplesSet samples = new SamplesSet();
             SamplesSet samples = DatasetManager.TrainSet;
 
-            for (int i = 0; i < (int)TrainingSizeCounter.Value; i++)
-                samples.AddSample(generator.GenerateFigure());
+            //for (int i = 0; i < (int)TrainingSizeCounter.Value; i++)
+                //samples.AddSample(generator.GenerateFigure());
 
             double accuracy = samples.TestNeuralNetwork(Net);
 
