@@ -1,9 +1,14 @@
-﻿using AForge.WindowsForms;
+﻿using Accord.IO;
+using AForge.WindowsForms;
+using AForge.WindowsForms.Properties;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Runtime;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -159,18 +164,55 @@ namespace NeuralNetwork1
             Enabled = true;
         }
 
+        string pathOrigin = Directory.GetParent(Directory.GetCurrentDirectory()).Parent.FullName + "\\ORIGIN";
+        string path = Directory.GetParent(Directory.GetCurrentDirectory()).Parent.FullName + "\\DATASET";
+
         private void button3_Click(object sender, EventArgs e)
         {
-            //  Проверяем корректность задания структуры сети
+            // Проверяем корректность задания структуры сети
             int[] structure = CurrentNetworkStructure();
-            //if (structure.Length < 2 || structure[0] != 400 ||
-            //    structure[structure.Length - 1] != generator.FigureCount)
-            //{
-            //    MessageBox.Show(
-            //        $"В сети должно быть более двух слоёв, первый слой должен содержать 400 нейронов, последний - ${generator.FigureCount}",
-            //        "Ошибка", MessageBoxButtons.OK);
-            //    return;
-            //}
+
+            // Пересоздаём датасет
+            var dirsOrigin = Directory.GetDirectories(pathOrigin); // получаем пути к папкам датасета
+
+            // Очищаем все папки
+            //TODO
+
+            //Создаём новые образцы
+            foreach (var dir in dirsOrigin)
+            {
+                var key = dir.Substring(dir.Length - 1);
+                string[] fnames = Directory.GetFiles(dir);
+
+                // папка датасета (куда сохраняем)
+                string targetPath = Path.Combine(path, key);
+        
+                if (!Directory.Exists(targetPath))
+                {
+                    Console.WriteLine($"Папка {targetPath} не существует.");
+                    continue;
+                }
+
+                int index = 0;
+                //для каждого оригинала
+                foreach (string fname in fnames)
+                {
+                    Console.WriteLine(fname);
+                    // добавить в датасет
+                    try
+                    {
+                        using (Bitmap bmp = new Bitmap(fname))
+                        {
+                            Bitmap processedImage = ProcessImage(bmp);
+                            processedImage.Save(Path.Combine(targetPath, index++ + ".bmp"), System.Drawing.Imaging.ImageFormat.Bmp);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Ошибка при обработке файла {fname}: {ex.Message}");
+                    }
+                }
+            }
 
             // Чистим старые подписки сетей
             foreach (var network in networksCache.Values)
@@ -225,6 +267,90 @@ namespace NeuralNetwork1
         private void testNetButton_MouseEnter(object sender, EventArgs e)
         {
             infoStatusLabel.Text = "Тестировать нейросеть на тестовой выборке такого же размера";
+        }
+
+        public Bitmap ProcessImage(Bitmap original)
+        {
+            // На вход поступает необработанное изображение из ORIGIN
+
+            //  Теперь всю эту муть пилим в обработанное изображение
+            var orig = AForge.Imaging.UnmanagedImage.FromManagedImage(original);
+
+            AForge.Imaging.Filters.Grayscale grayFilter = new AForge.Imaging.Filters.Grayscale(0.2125, 0.7154, 0.0721);
+            var uProcessed = grayFilter.Apply(orig);
+
+            //  Пороговый фильтр
+            AForge.Imaging.Filters.BradleyLocalThresholding threshldFilter = new AForge.Imaging.Filters.BradleyLocalThresholding();
+            threshldFilter.PixelBrightnessDifferenceLimit = 0.15f;
+            threshldFilter.ApplyInPlace(uProcessed);
+
+            string info = processSample(ref uProcessed);
+            return uProcessed.ToManagedImage();
+        }
+
+        private int _sampleSizeX = 75;
+        private int _sampleSizeY = 150;
+
+        private string processSample(ref AForge.Imaging.UnmanagedImage unmanaged)
+        {
+            string rez = "Обработка";
+
+            ///  Инвертируем изображение
+            //AForge.Imaging.Filters.Invert InvertFilter = new AForge.Imaging.Filters.Invert();
+            //InvertFilter.ApplyInPlace(unmanaged);
+
+            ///    Создаём BlobCounter, выдёргиваем самый большой кусок, масштабируем, пересечение и сохраняем
+            ///    изображение в эксклюзивном использовании
+            AForge.Imaging.BlobCounterBase bc = new AForge.Imaging.BlobCounter();
+
+            bc.FilterBlobs = true;
+            bc.MinWidth = 3;
+            bc.MinHeight = 3;
+            // Упорядочиваем по размеру
+            bc.ObjectsOrder = AForge.Imaging.ObjectsOrder.Size;
+            // Обрабатываем картинку
+
+            bc.ProcessImage(unmanaged);
+
+            Rectangle[] rects = bc.GetObjectsRectangles();
+            rez = "Насчитали " + rects.Length.ToString() + " прямоугольников!";
+            //if (rects.Length == 0)
+            //{
+            //    finalPics[r, c] = AForge.Imaging.UnmanagedImage.FromManagedImage(new Bitmap(100, 100));
+            //    return 0;
+            //}
+
+            // К сожалению, код с использованием подсчёта blob'ов не работает, поэтому просто высчитываем максимальное покрытие
+            // для всех блобов - для нескольких цифр, к примеру, 16, можем получить две области - отдельно для 1, и отдельно для 6.
+            // Строим оболочку, включающую все блоки. Решение плохое, требуется доработка
+            int lx = unmanaged.Width;
+            int ly = unmanaged.Height;
+            int rx = 0;
+            int ry = 0;
+            for (int i = 0; i < rects.Length; ++i)
+            {
+                if (lx > rects[i].X) lx = rects[i].X;
+                if (ly > rects[i].Y) ly = rects[i].Y;
+                if (rx < rects[i].X + rects[i].Width) rx = rects[i].X + rects[i].Width;
+                if (ry < rects[i].Y + rects[i].Height) ry = rects[i].Y + rects[i].Height;
+            }
+
+            // Обрезаем края, оставляя только центральные блобчики
+            AForge.Imaging.Filters.Crop cropFilter = new AForge.Imaging.Filters.Crop(new Rectangle(lx, ly, rx - lx, ry - ly));
+            try
+            {
+                unmanaged = cropFilter.Apply(unmanaged);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("Ошибка чтения символа с картинки");
+            }
+
+            //  Масштабируем до нужного размера
+            AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(_sampleSizeX, _sampleSizeY);
+            unmanaged = scaleFilter.Apply(unmanaged);
+
+            return rez;
         }
     }
 }
