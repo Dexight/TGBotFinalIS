@@ -144,15 +144,8 @@ namespace AForge.WindowsForms
             threshldFilter.ApplyInPlace(uProcessed);
 
 
-            if (settings.processImg)
-            {
-             
-                string info = processSample(ref uProcessed);
+            string info = processSample(ref uProcessed);
 
-                // Заготовочная надпись на вебке - "нашли столько-то прямоугольников"
-                //Font f = new Font(FontFamily.GenericSansSerif, 20);
-                //g.DrawString(info, f, Brushes.Black, 100, 100);
-            }
 
             //  Получить значения сенсоров из обработанного изображения размера 100x100
 

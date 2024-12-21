@@ -13,6 +13,7 @@ using Telegram.Bot.Types.Enums;
 using System.Windows.Forms;
 using AForge.WindowsForms;
 using System.Reflection.Emit;
+using System.Reflection;
 
 namespace NeuralNetwork1
 {
@@ -26,7 +27,10 @@ namespace NeuralNetwork1
         Form1 motherForm;
 
         AForge.WindowsForms.MagicEye eye = new AForge.WindowsForms.MagicEye();
-
+        // Путь к папке DATASETS
+        private string processedInputsPath = Path.Combine(Application.StartupPath, @"..\..\INPUTS");
+        private int pictureCounter = 0;
+        
         // CancellationToken - инструмент для отмены задач, запущенных в отдельном потоке
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
         public TLGBotik(Form1 motherForm, BaseNetwork net,  UpdateTLGMessages updater)
@@ -36,6 +40,27 @@ namespace NeuralNetwork1
             botik = new Telegram.Bot.TelegramBotClient(botKey);
             formUpdater = updater;
             perseptron = net;
+
+            clearInputs();
+        }
+
+        private void clearInputs()
+        {
+            if (!Directory.Exists(processedInputsPath))
+            {
+                Console.WriteLine($"Папка {processedInputsPath} не существует.");
+                return;
+            }
+
+            string[] files = Directory.GetFiles(processedInputsPath);
+            foreach (var file in files)
+                System.IO.File.Delete(file);
+        }
+
+        private void AddToInputs(System.Drawing.Bitmap b)
+        {
+            string filePath = Path.Combine(processedInputsPath, pictureCounter++ + ".bmp");
+            b.Save(filePath, System.Drawing.Imaging.ImageFormat.Bmp);
         }
 
         public void SetNet(BaseNetwork net)
@@ -71,7 +96,7 @@ namespace NeuralNetwork1
                 eye.ProcessImage(bm);
                 bm = eye.processed;
 
-
+                AddToInputs(bm);
                 // меняет изображение в форме, но падает для нескольких запросов
                 //motherForm.UpdatePicture(bm);
 
