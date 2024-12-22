@@ -1,20 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Accord.Math;
+using AForge.WindowsForms;
+using System;
+using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Extensions.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using System.Windows.Forms;
-using AForge.WindowsForms;
-using System.Reflection.Emit;
-using System.Reflection;
-using System.Drawing;
+using static System.Net.WebRequestMethods;
 
 namespace NeuralNetwork1
 {
@@ -22,6 +20,8 @@ namespace NeuralNetwork1
     {
         public Telegram.Bot.TelegramBotClient botik = null;
 
+        private AIMLBotik aiml = new AIMLBotik(); // подвязываем сюда aiml
+        
         private UpdateTLGMessages formUpdater;
 
         private BaseNetwork perseptron = null;
@@ -31,10 +31,10 @@ namespace NeuralNetwork1
         // Путь к папке DATASETS
         private string processedInputsPath = Path.Combine(Application.StartupPath, @"..\..\INPUTS");
         private int pictureCounter = 0;
-        
+
         // CancellationToken - инструмент для отмены задач, запущенных в отдельном потоке
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
-        public TLGBotik(Form1 motherForm, BaseNetwork net,  UpdateTLGMessages updater)
+        public TLGBotik(Form1 motherForm, BaseNetwork net, UpdateTLGMessages updater)
         {
             this.motherForm = motherForm;
             var botKey = System.IO.File.ReadAllText("botkey.txt");
@@ -85,7 +85,7 @@ namespace NeuralNetwork1
                 var imageStream = new MemoryStream();
                 await botik.DownloadFileAsync(fl.FilePath, imageStream, cancellationToken: cancellationToken);
                 var img = System.Drawing.Image.FromStream(imageStream);
-                
+
                 System.Drawing.Bitmap bm = new System.Drawing.Bitmap(img);
 
                 //  Масштабируем aforge
@@ -94,7 +94,7 @@ namespace NeuralNetwork1
 
                 //AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(75, 125);
                 //bm = scaleFilter.Apply(bm);
-                
+
                 bm = ProcessImage(bm);
 
                 AddToInputs(bm);
@@ -108,7 +108,7 @@ namespace NeuralNetwork1
                 Sample sample = DatasetManager.CreateOneSample(bm);
                 string res = "";
 
-                switch(perseptron.Predict(sample))
+                switch (perseptron.Predict(sample))
                 {
                     case FigureType.Zero: res = "0"; break;
                     case FigureType.One: res = "1"; break;
@@ -121,20 +121,46 @@ namespace NeuralNetwork1
                     case FigureType.Eight: res = "8"; break;
                     case FigureType.Nine: res = "9"; break;
                 }
-                botik.SendTextMessageAsync(message.Chat.Id, "Я думаю это цифра " + res);
+                //UpdateLastDigitInAIML(res);
+                botik.SendTextMessageAsync(message.Chat.Id, aiml.Talk("Я ДУМАЮ ЭТО " + res));
                 formUpdater("Picture recognized!");
                 return;
             }
 
-            if (message == null || message.Type != MessageType.Text) return;
-            if(message.Text == "Authors")
+            if (message == null) return;
+
+            if (message.Type == MessageType.Video)
+            {
+                botik.SendTextMessageAsync(message.Chat.Id, aiml.Talk("ВИДЕО"));
+                formUpdater("Я видео получил, спасибо... Смотреть я его конечно не буду");
+                return;
+            }
+
+            if (message.Type == MessageType.Voice)
+            {
+                //botik.SendTextMessageAsync(message.Chat.Id, aiml.Talk("АУДИО"));
+                var url1 = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTdgh5QNF_jD5pZikRioXeoqD-sc-UcZUmaFg&s";
+                var url2 = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQOeeHF60jDz5rp8XsaLiMu0kkkzxcfOg9sFg&s";
+                var url3 = "https://kartinkof.club/uploads/posts/2022-03/1648237070_20-kartinkof-club-p-mem-golosovie-soobshcheniya-20.jpg";
+                var urls = new string[3] { url1, url2, url3 };
+
+                var rnd = new Random();
+                botik.SendPhotoAsync(chatId: message.Chat.Id, photo: urls[rnd.Next(0, 3)], caption: aiml.Talk("АУДИО"));
+                formUpdater("Я не хочу слушать твое голосовое, но спасибо...");
+                return;
+            }
+
+            if (message.Text == "Authors")
             {
                 string authors = "Мовчан Егор, Тупикин Олег, Панихидин Дима";
                 botik.SendTextMessageAsync(message.Chat.Id, "Авторы проекта : " + authors);
             }
-            botik.SendTextMessageAsync(message.Chat.Id, "Bot reply : " + message.Text);
-            formUpdater(message.Text);
-            return;
+            if(message.Type == MessageType.Text)
+            {
+                botik.SendTextMessageAsync(message.Chat.Id, aiml.Talk(message.Text));
+                formUpdater(message.Text);
+                return;
+            }
         }
         Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
         {
@@ -158,7 +184,8 @@ namespace NeuralNetwork1
                 // Пробуем получить логин бота - тестируем соединение и токен
                 Console.WriteLine($"Connected as {botik.GetMeAsync().Result}");
             }
-            catch(Exception e) { 
+            catch (Exception e)
+            {
                 return false;
             }
             return true;
@@ -248,5 +275,6 @@ namespace NeuralNetwork1
             AForge.Imaging.Filters.ResizeBilinear scaleFilter = new AForge.Imaging.Filters.ResizeBilinear(_sampleSizeX, _sampleSizeY);
             unmanaged = scaleFilter.Apply(unmanaged);
         }
+
     }
 }
